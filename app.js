@@ -4,7 +4,7 @@ const cors = require('cors');
 const app = express();
 app.use(cors());
 
-mongoose.connect("mongodb+srv://sasank:123@cluster0.ulecm.mongodb.net/trainReservations?retryWrites=true&w=majority", {
+mongoose.connect("mongodb+srv://nikhitha:el77vaOZsfQZ8ttb@cluster0.7xyxy.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0", {
   serverSelectionTimeoutMS: 5000
 }).then(() => {
   console.log('Connected to MongoDB Atlas');

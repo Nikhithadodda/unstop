@@ -7,7 +7,7 @@ app.use(cors());
 mongoose.connect("mongodb+srv://nikhitha:el77vaOZsfQZ8ttb@cluster0.7xyxy.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0", {
   serverSelectionTimeoutMS: 5000
 }).then(() => {
-  console.log('Connected to MongoDB Atlas');
+  console.log('Connected');
 });
 
 const stchema = new mongoose.Schema({

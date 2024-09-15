@@ -4,82 +4,133 @@ const cors = require('cors');
 const app = express();
 app.use(cors());
 
-mongoose.connect("mongodb+srv://nikhitha:el77vaOZsfQZ8ttb@cluster0.7xyxy.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0", {
+
+
+// MongoDB atlas Connection
+mongoose.connect("mongodb+srv://lakshminikhithad:123@cluster0.64qlj.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0", {
   serverSelectionTimeoutMS: 5000
 }).then(() => {
-  console.log('Connected');
+  console.log('Connected to MongoDB Atlas');
+}).catch(err => {
+  console.error('Error connecting to MongoDB Atlas:', err.message);
 });
-
-const stchema = new mongoose.Schema({
-  sttatus: {
+const seatSchema = new mongoose.Schema({
+  seatStatus: {
     type: String,
     required: true,
-    default: "0".repeat(80)
+    default: "0".repeat(80) // Initialize 80 seats as available ('000...0')
   }
 });
 
-const st = mongoose.model('st', stchema);
-app.use(express.json());
 
-app.get('/st', async (req, res) => {
-  let stData = await st.findOne();
-  if (!stData) {
-    stData = new st();
-    await stData.save();
+const Seat = mongoose.model('Seat', seatSchema);
+app.use(express.json()); 
+
+
+// get the current seat status
+app.get('/seats', async (req, res) => {
+  try {
+    let seatData = await Seat.findOne(); // Fetch seat data
+    if (!seatData) {
+      // Initialize if not available
+      seatData = new Seat();
+      await seatData.save();
+    }
+    res.json({ all_seats: seatData.seatStatus });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch seat data' });
   }
-  res.json({ all_st: stData.sttatus });
 });
 
-const rst = (allst, numst) => {
-  let rdst = [];
-  let stArray = allst.split('');
-  const rows = 11;
-  for (let i = 0; i < stArray.length; i += 7) {
-    let rowSize = i === 77 ? 3 : 7;
-    const row = stArray.slice(i, i + rowSize);
-    const availablest = row.map((st, index) => st === '0' ? index : null).filter(index => index !== null);
-    if (availablest.length >= numst) {
-      for (let j = 0; j < numst; j++) {
-        stArray[i + availablest[j]] = '1';
-        rdst.push(i + availablest[j]);
+
+// Logic to reserve seats with last row having 3 seats
+const reserveSeats = (allSeats, numSeats) => {
+  let reservedSeats = [];
+  let seatsArray = allSeats.split('');
+  const rows = 11; // 11 rows (10 rows of 7 and 1 row of 3)
+  for (let i = 0; i < seatsArray.length; i += 7) {
+    let rowSize = i === 77 ? 3 : 7; // Handle the last row separately (3 seats)
+    const row = seatsArray.slice(i, i + rowSize);
+    const availableSeats = row.map((seat, index) => seat === '0' ? index : null).filter(index => index !== null);
+    if (availableSeats.length >= numSeats) {
+      // Reserve seats in this row
+      for (let j = 0; j < numSeats; j++) {
+        seatsArray[i + availableSeats[j]] = '1';
+        reservedSeats.push(i + availableSeats[j]);
       }
-      return { updatedst: stArray.join(''), rdst };
+      return { updatedSeats: seatsArray.join(''), reservedSeats };
     }
   }
-  for (let i = 0; i < stArray.length; i++) {
-    if (stArray[i] === '0') {
-      stArray[i] = '1';
-      rdst.push(i);
-      if (rdst.length === numst) {
-        return { updatedst: stArray.join(''), rdst };
+  // If not enough seats in a row, reserve the nearby available seats
+  for (let i = 0; i < seatsArray.length; i++) {
+    if (seatsArray[i] === '0') {
+      seatsArray[i] = '1';
+      reservedSeats.push(i);
+      if (reservedSeats.length === numSeats) {
+        return { updatedSeats: seatsArray.join(''), reservedSeats };
       }
     }
   }
-  return { updatedst: stArray.join(''), rdst };
+  return { updatedSeats: seatsArray.join(''), reservedSeats };
 };
 
-app.post('/r', async (req, res) => {
-  const { numst } = req.body;
-  if (numst < 1 || numst > 7) {
-    return res.status(400).json({ error: 'Invalid' });
+
+
+//reserve seats
+app.post('/reserve', async (req, res) => {
+  const { numSeats } = req.body;
+  if (numSeats < 1 || numSeats > 7) {
+    return res.status(400).json({ error: 'Invalid number of seats. You can reserve between 1 and 7 seats.' });
   }
-  let stData = await st.findOne();
-  if (!stData) {
-    stData = new st();
+  try {
+    let seatData = await Seat.findOne();
+    if (!seatData) {
+      seatData = new Seat();
+    }
+    const { updatedSeats, reservedSeats } = reserveSeats(seatData.seatStatus, numSeats);
+
+    seatData.seatStatus = updatedSeats;
+    await seatData.save();
+
+    res.json({ success: true, reservedSeats });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to reserve seats' });
   }
-  const { updatedst, rdst } = rst(stData.sttatus, numst);
-  stData.sttatus = updatedst;
-  await stData.save();
-  res.json({ success: true, rdst });
 });
 
+
+
+
+//reset seats (for developer use only .. reduces efort to go back to db to reset the seats to 0)
+// Add reset endpoint to clear all seats
+app.post('/reset', async (req, res) => {
+  try {
+    let seatData = await Seat.findOne();
+    if (!seatData) {
+      seatData = new Seat();
+    }
+    seatData.seatStatus = "0".repeat(80); // Reset all 80 seats to '0'
+    await seatData.save();
+    alert("seats set successful")
+    res.json({ success: true, message: "Seats reset successfully." });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to reset seats' });
+  }
+});
+
+
+
+// Start the server
 app.listen(5000, function() {
   console.log('Server is running on http://localhost:5000');
 });
 
+
 const path = require('path');
+// Serve static files (HTML, CSS, JS)
 app.use(express.static(path.join(__dirname)));
 
+// Root route to serve the index.html
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
